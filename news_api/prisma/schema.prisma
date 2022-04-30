@@ -6,16 +6,16 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE")
+  provider = "sqlite"
+  url      = env("DATABASE_TEST")
 }
 
 model News {
-  id Int @id @default(autoincrement())
-  url String //뉴스 링크
-  contentId String @unique//뉴스 고유 번호
-  content String //뉴스 본문
+  id         Int       @id @default(autoincrement())
+  url        String //뉴스 링크
+  contentId  String    @unique //뉴스 고유 번호
+  content    String //뉴스 본문
   uploadTime DateTime? //뉴스 업로드 시간
-  editTime DateTime? //뉴스 수정 시간
-  stampTime DateTime @default(now()) //현재시간
+  editTime   DateTime? //뉴스 수정 시간
+  stampTime  DateTime  @default(now()) //현재시간
 }
