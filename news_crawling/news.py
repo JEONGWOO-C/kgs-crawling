@@ -1,60 +1,185 @@
 from cgitb import text
 from email import header
-from msilib.schema import TextStyle
 from urllib.request import Request, urlopen
-import requests, re
+import requests
+import re
 import pandas as pd
 from bs4 import BeautifulSoup
 import time
 from datetime import datetime, timedelta
+from python_graphql_client import GraphqlClient
 
-def getsoup(url): #BeautifulSoup를 사용해 HTML Request
-    headers = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Whale/3.12.129.46 Safari/537.36'}
-    res = requests.get(url, headers=headers)
-    return BeautifulSoup(res.content, 'html.parser')
+client = GraphqlClient(endpoint="http://localhost:1000")
 
-def getDateRange():
-    START_DATE = datetime.today() #오늘 날짜(시작날짜)
-    END_DATE = datetime.strptime("20220601", "%Y%m%d")
-    
-    DATE_RANGE = []
-    while START_DATE.strftime("%Y%m%d") != END_DATE.strftime("%Y%m%d"):
-        DATE_RANGE.append(START_DATE.strftime("%Y%m%d"))
-        START_DATE += timedelta(days=1)
-    
-    return DATE_RANGE
+# Init 단발성 이벤트 필요할때만
+# 대분류 URL
+# 대분류 URL > 소분류 URL
+# 대분류 URL > 소분류 URL > 뉴스기사 URL
+# 대분류 URL > 소분류 URL > 뉴스기사 URL > 각 뉴스정보
+BASE_URL = "https://news.naver.com"
+IS_INIT = True
+MAIN_CATEGORY = ["정치", "경제", "사회", "생활/문화", "IT/과학"]
+SUB_CATEGORY = ["청와대", "국회/정당", "북한", "행정", "국방/외교", "정치일반", "금융", "증권", "산업/재계",
+                "중기/벤처", "부동산", "글로벌 경제", "생활경제", "경제 일반", "사건사고", "교육", "노동",
+                "언론", "환경", "인권/복지", "식품/의류", "지역", "인물", "사회 일반", "건강정보", "자동차/시승기", "도로/교통",
+                "여행/레저", "음식/막집", "패션/뷰티", "공연/전시", "책", "종교", "생활문화 일반", "모바일", "인터넷/SNS", "통신/뉴미디어",
+                "IT 일반", "보안/해킹", "컴퓨터", "게임/리뷰", "과학 일반"]
+NEWS_COMPANY = ["연합뉴스", "매일경제", "조선일보", "MBC", "스포츠조선",
+                "머니투데이", "SBS", "한겨레", "KBS", "동아일보", "파이낸셜뉴스", "중앙일보", "YTN", "JTBC", "아시아경제", "헤럴드경제", "이데일리"]
+NEWS_URL = []
+NEWS = []
 
+
+deleteAll = """
+    mutation Mutation {
+        deleteAll
+    }
+"""
+
+insertNews = """
+    mutation Mutation($uniqueId: String!, $url: String!, $urlOrigin: String!, $title: String!, $content: String!, $uploadTime: String!, $main: String!, $sub: String!) {
+        insertNews(uniqueId: $uniqueId, url: $url, urlOrigin: $urlOrigin, title: $title, content: $content, uploadTime: $uploadTime, main: $main, sub: $sub)
+    }
+"""
+
+
+# 과정 함수 1
+# 메인카테고리의 URL을 불러오는 부분
 def getMainCategoryUrl():
-    URL_LIST = []
+    RESULT = []  # Return할 함수 결과
 
-    BASE_URL = 'https://news.naver.com/main/list.nhn?mode=LSD&mid=sec&sid1='
-    MAIN_CATEGORY = ['100', '101', '102', '103', '104', '105']
-    #code 분류 100 정치 101 경제 102 사회 103 생활/문화 104 세계 105 IT/과학
-    for list in MAIN_CATEGORY:
-        URL_LIST.append(BASE_URL+list)
+    # 기본 Html Request
+    reqUrl = Request(BASE_URL, headers={"User-Agent": "Mozilla/5.0"})
+    html = urlopen(reqUrl)
+    soup = BeautifulSoup(html, "html.parser")
 
-    return URL_LIST
+    # 필요한 데이터 영역 필터
+    soup = soup.find("ul", class_="Nlnb_menu_list")
+    soup = soup.findAll("a")
 
-def getSubCategoryUrl(MainCategoryUrl, dateList):
-    URL_LIST = []
+    # 데이터 추출
+    for i in soup:
+        url = i["href"] if i["href"] != None else None
 
-    for mainUrl in MainCategoryUrl:
-        soup = getsoup(mainUrl)
+        if i.text.strip() in MAIN_CATEGORY:
+            RESULT.append([i.text.strip(), url])  # 결과추가
 
-        #각 page의 뉴스를 news_list에 저장
-        news_list = soup.select('.massmedia li')
-        news_list.extend(soup.select('.massmedia li'))
-        print(news_list)
-        #page에 있는 뉴스 주소를 가져와 url_list에 append
-        for line in news_list:
-            URL_LIST.append(line.a.get('href'))
-        
-    return URL_LIST
-#main url, sub url, date
+    return RESULT
+
+
+# 과정 함수 2
+# 서브카테고리의 URL을 불러오는 부분
+def getSubCategoryUrl(mainCategoryURL):
+    RESULT = []  # Return할 함수 결과
+
+    for main in mainCategoryURL:
+
+        # 기본 Html Request
+        reqUrl = Request(main[1],
+                         headers={"User-Agent": "Mozilla/5.0"})
+        html = urlopen(reqUrl)
+        soup = BeautifulSoup(html, "html.parser")
+
+        # 필요한 데이터 영역 필터
+        soup = soup.find("ul", class_="nav")
+        soup = soup.find_all("a")
+
+        # 데이터 추출
+        for i in soup:
+            url = i["href"] if i["href"] != None else None
+
+            if i.text.strip() in SUB_CATEGORY:
+                # print([main[0], i.text.strip(), BASE_URL+url])
+                RESULT.append([main[0], i.text.strip(), BASE_URL+url])  # 결과추가
+    return RESULT
+
+
+def no_space(text):
+    text1 = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    return text1
+
+
+def getNewsUrl(subCategoryURL):
+    return True
+
+
+def getNewsContent(newsURL, main, sub):
+    uniqueId = ""
+    uploadTime = ""
+    urlOrigin = ""
+    title = ""
+    content = ""
+
+    uniqueId = newsURL[newsURL.rfind('/') + 1: newsURL.rfind("?sid")]
+    # 필요한 데이터 영역 필터
+    # 기본 Html Request
+    reqUrl = Request(newsURL,
+                     headers={"User-Agent": "Mozilla/5.0"})
+    html = urlopen(reqUrl)
+    soup = BeautifulSoup(html, "html.parser")
+
+    title = soup.find("h2", class_="media_end_head_headline").text.strip()
+
+    uploadTime = soup.find("span", class_="media_end_head_info_datestamp_time")[
+        'data-date-time']
+
+    urlOrigin = soup.find("a", class_="media_end_head_origin_link")
+    urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
+
+    content = soup.find("div", id="dic_area")
+    # 뉴스 요약 삭제하기
+    content = re.sub('<strong.*?>.*?</strong>', '', str(content))
+    # HTML tag 삭제하기
+    content = re.sub('(<([^>]+)>)', '', str(content))
+    # 개행문자, 탭, 백슬래시 제거하기
+    content = content.replace("\n", "").replace("\t", "").replace('\\', '')
+
+    return {
+        "uniqueId": uniqueId,
+        "url": newsURL,
+        "urlOrigin": urlOrigin,
+        "title": title,
+        "content": content,
+        "uploadTime": uploadTime,
+        "main": main,
+        "sub": sub}
+
+
+def initAll(subCategoryURL):
+    deleteResponse = client.execute(query=deleteAll)
+    print(deleteResponse)
+    for category in subCategoryURL:
+        # 기본 Html Request
+        reqUrl = Request(category[2],
+                         headers={"User-Agent": "Mozilla/5.0"})
+        html = urlopen(reqUrl)
+        soup = BeautifulSoup(html, "html.parser")
+
+        # 필요한 데이터 영역 필터
+        soup = soup.find("ul", class_="type06_headline")
+        soup = soup.find("a")
+        newsUrl = soup["href"] if soup["href"] != None else None
+        newsContent = getNewsContent(newsUrl, category[0], category[1])
+
+        insertResponse = client.execute(
+            query=insertNews, variables=newsContent)
+        print(insertResponse)
+        print("--------")
+
+    return True
+    # 단계1 : DB의 모든데이터를 지움
+    # 단계2 : 각 SUB_CATEGORY 별 NEWS 한개씩만 추가
+
 
 if __name__ == "__main__":
-    dateList = getDateRange()
+    # mainCategoryURL [0]:MAIN CATEGORY, [1]:MAIN_URL
+    mainCategoryURL = getMainCategoryUrl()
 
-    MainCategoryUrl = getMainCategoryUrl()
-    SubCategoryUrl = getSubCategoryUrl(MainCategoryUrl, dateList)
-    print(SubCategoryUrl)
+    # subCategoryURL [0]:MAIN CATEGORY [1]:SUB CATEGORY, [2]:SUB_URL
+    subCategoryURL = getSubCategoryUrl(mainCategoryURL)
+
+    # Flush Buffer
+    if(IS_INIT):
+        initAll(subCategoryURL)
+
+    newsURL = getNewsUrl(subCategoryURL)
