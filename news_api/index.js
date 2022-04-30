@@ -17,7 +17,8 @@ const typeDefs = `
         readNews(id:Int!):News
     }
     type Mutation {
-        insertNews(url:String!, contentId:String!, content:String!, uploadTime:String, editTime:String): Boolean!
+        insertNews(uniqueId:String!, url:String!, urlOrigin:String!, title:String!, content:String!, uploadTime:String!, main:String!, sub:String!): Boolean!
+        deleteAll:Boolean!
     }
 `;
 
@@ -39,9 +40,19 @@ const resolvers = {
     },
   },
   Mutation: {
+    deleteAll: async () => {
+      let result = true;
+      try {
+        await db.news.deleteMany({});
+      } catch (e) {
+        console.log(e);
+        result = false;
+      }
+      return result;
+    },
     insertNews: async (
       _,
-      { url, contentId, content, uploadTime, editTime },
+      { uniqueId, url, urlOrigin, title, content, uploadTime, main, sub },
       ___
     ) => {
       let result = true;
@@ -59,11 +70,14 @@ const resolvers = {
 
         await db.news.create({
           data: {
+            uniqueId,
             url,
-            contentId,
+            urlOrigin,
+            title,
             content,
-            uploadTime,
-            editTime,
+            uploadTime: new Date(uploadTime),
+            main,
+            sub,
           },
         });
       } catch (e) {
