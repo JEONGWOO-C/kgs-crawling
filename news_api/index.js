@@ -40,18 +40,13 @@ const resolvers = {
       return result;
     },
     checkNews: async (_, { uniqueId }, ___) => {
-      let result = false;
-      try {
-        await db.news.findUnique({
-          where: {
-            uniqueId,
-          },
-        });
-      } catch (e) {
-        console.log(e);
-        result = true;
-      }
-      return result
+      const result = await db.news.findUnique({
+        where: { 
+          uniqueId,
+        },
+      });
+      if(result==null) return false;
+      else return true;
     },
   },
   Mutation: {

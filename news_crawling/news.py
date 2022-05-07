@@ -1,5 +1,7 @@
 from cgitb import text
 from email import header
+from enum import unique
+from pickle import NONE
 from urllib.request import Request, urlopen
 import requests
 import re
@@ -22,17 +24,17 @@ IS_INIT = True
 MAIN_CATEGORY = ["정치", "경제", "사회", "생활/문화", "IT/과학"]
 SUB_CATEGORY = ["청와대", "국회/정당", "북한", "행정", "국방/외교", "정치일반", "금융", "증권", "산업/재계",
                 "중기/벤처", "부동산", "글로벌 경제", "생활경제", "경제 일반", "사건사고", "교육", "노동",
-                "언론", "환경", "인권/복지", "식품/의류", "지역", "인물", "사회 일반", "건강정보", "자동차/시승기", "도로/교통",
-                "여행/레저", "음식/막집", "패션/뷰티", "공연/전시", "책", "종교", "생활문화 일반", "모바일", "인터넷/SNS", "통신/뉴미디어",
-                "IT 일반", "보안/해킹", "컴퓨터", "게임/리뷰", "과학 일반"]
+                "언론", "환경", "인권/복지", "식품/의류", "지역", "인물", "사회 일반", "건강정보", "자동차/시승기", 
+                "도로/교통", "여행/레저", "음식/막집", "패션/뷰티", "공연/전시", "책", "종교", "생활문화 일반", 
+                "모바일", "인터넷/SNS", "통신/뉴미디어", "IT 일반", "보안/해킹", "컴퓨터", "게임/리뷰", "과학 일반"]
 NEWS_COMPANY = ["연합뉴스", "매일경제", "조선일보", "MBC", "스포츠조선",
                 "머니투데이", "SBS", "한겨레", "KBS", "동아일보", "파이낸셜뉴스", "중앙일보", "YTN", "JTBC", "아시아경제", "헤럴드경제", "이데일리"]
 NEWS_URL = []
 NEWS = []
 
-readNews = """
-    query Query {
-        readNews
+checkNews = """
+    query Query {$uniqueId: String!){
+        checkNews(uniqueId: $uniqueId)
     }
 """
 
@@ -113,17 +115,52 @@ def getNewsUrl(subCategoryURL):
             # 필요한 데이터 영역 필터
             newsData = soup.select('.type06_headline li dl')
             for news in newsData:
-                if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
-                    print(news.a.get('href'))
-                    #urllist.append(news.a.get('href'))
+                # 각 뉴스 URL 필터
+                newsUrl = news.a.get('href')
+                # 각 뉴스별 ID 필터
+                uniqueId = newsUrl[newsUrl.rfind('/') + 1: newsUrl.rfind("?sid")]
+                variables = { "uniqueId": uniqueId }
 
+                # 중복 뉴스 확인
+                checkResponse = client.execute(query=checkNews, variables = variables)
+                print(checkResponse)
+                if client.execute(query=checkNews, variables=uniqueId) == True:
+                    continue
+                
+                # 뉴스 신문사 필터
+                if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
+                    newsContent = getNewsContent(newsUrl, subCategoryURL[0], subCategoryURL[1])
+                    print(newsContent)
+                    insertResponse = client.execute(
+                        query=insertNews, variables=newsContent)
+                    print(insertResponse)
+                    print("--------")
+            
             newsData = soup.select('.type06 li dl')
             for news in newsData:
-                if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
-                    print(news.a.get('href'))
-                    #urllist.append(news.a.get('href'))
+                 # 각 뉴스 URL 필터
+                newsUrl = news.a.get('href')
+                # 각 뉴스별 ID 필터
+                uniqueId = newsUrl[newsUrl.rfind('/') + 1: newsUrl.rfind("?sid")]
+                variables = { "uniqueId": uniqueId }
+                print(variables)
 
-    return True
+                # 중복 뉴스 확인
+                checkResponse = client.execute(query=checkNews, variables = variables)
+                print(checkResponse)
+                if client.execute(query=checkNews, variables=uniqueId) == True:
+                    continue
+                
+                # 뉴스 신문사 필터
+                if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
+                    newsContent = getNewsContent(newsUrl, subCategoryURL[0], subCategoryURL[1])
+                    print(newsContent)
+                    insertResponse = client.execute(
+                        query=insertNews, variables=newsContent)
+                    print(insertResponse)
+                    print("--------")
+                
+    return
 
 def crawling_data_preprocessing(data):
     split_result=[]
@@ -168,15 +205,35 @@ def getNewsContent(newsURL, main, sub):
     html = urlopen(reqUrl)
     soup = BeautifulSoup(html, "html.parser")
 
-    title = soup.find("h2", class_="media_end_head_headline").text.strip()
+    if soup.find("h2", class_="media_end_head_headline") == None :
+        title = soup.find("h2", class_="end_tit").text.strip()
+        
+        Time = soup.find("span", class_="author").find('em').text.strip()
+        if Time.find('오전') == -1:
+            Time = Time.replace(u'오후', "") + ' pm'
+        else:
+            Time = Time.replace(u'오전', "") + ' am'
+        
+        uploadTime = datetime.strptime(Time, '%Y.%m.%d.  %I:%M %p')
 
-    uploadTime = soup.find("span", class_="media_end_head_info_datestamp_time")[
-        'data-date-time']
+        urlOrigin = soup.find("a", class_="btn_news_origin")
+        urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
 
-    urlOrigin = soup.find("a", class_="media_end_head_origin_link")
-    urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
+        content = soup.find("div", id="articeBody")
+        #ex : https://entertain.naver.com/read?oid=469&aid=0000673736
 
-    content = soup.find("div", id="dic_area")
+    else:
+        title = soup.find("h2", class_="media_end_head_headline").text.strip()
+        
+        uploadTime = soup.find("span", class_="media_end_head_info_datestamp_time")[
+            'data-date-time']
+
+        urlOrigin = soup.find("a", class_="media_end_head_origin_link")
+        urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
+
+        content = soup.find("div", id="dic_area")
+        #ex : https://n.news.naver.com/mnews/article/658/0000008985?sid=102
+    
     # 뉴스 요약 삭제하기
     content = re.sub('<strong.*?>.*?</strong>', '', str(content))
     # HTML tag 삭제하기
@@ -211,7 +268,6 @@ def initAll(subCategoryURL):
         soup = soup.find("a")
         newsUrl = soup["href"] if soup["href"] != None else None
         newsContent = getNewsContent(newsUrl, category[0], category[1])
-
         insertResponse = client.execute(
             query=insertNews, variables=newsContent)
         print(insertResponse)
@@ -229,7 +285,7 @@ if __name__ == "__main__":
     subCategoryURL = getSubCategoryUrl(mainCategoryURL)
 
     # Flush Buffer
-    if(IS_INIT):
-        initAll(subCategoryURL)
+    #if(IS_INIT):
+    #    initAll(subCategoryURL)
 
-    #getNewsUrl(subCategoryURL)
+    getNewsUrl(subCategoryURL)
