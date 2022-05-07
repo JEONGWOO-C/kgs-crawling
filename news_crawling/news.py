@@ -33,7 +33,7 @@ NEWS_URL = []
 NEWS = []
 
 checkNews = """
-    query Query {$uniqueId: String!){
+    query Query ($uniqueId: String!){
         checkNews(uniqueId: $uniqueId)
     }
 """
@@ -104,8 +104,9 @@ def no_space(text):
     return text1
 
 def getNewsUrl(subCategoryURL):
-    for page_num in range(1, 31):
-        for sub in subCategoryURL:
+    for sub in subCategoryURL:
+        isInserted = False
+        for page_num in range(1, 31):
             # 기본 Html Request
             reqUrl = Request(sub[2]+'&page='+str(page_num),
                                 headers={"User-Agent": "Mozilla/5.0"})
@@ -124,8 +125,9 @@ def getNewsUrl(subCategoryURL):
                 # 중복 뉴스 확인
                 checkResponse = client.execute(query=checkNews, variables = variables)
                 print(checkResponse)
-                if client.execute(query=checkNews, variables=uniqueId) == True:
-                    continue
+                if checkResponse['data']['checkNews'] == True:
+                    isInserted = True
+                    break
                 
                 # 뉴스 신문사 필터
                 if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
@@ -135,7 +137,9 @@ def getNewsUrl(subCategoryURL):
                         query=insertNews, variables=newsContent)
                     print(insertResponse)
                     print("--------")
-            
+            if isInserted == True:
+                break
+
             newsData = soup.select('.type06 li dl')
             for news in newsData:
                  # 각 뉴스 URL 필터
@@ -148,8 +152,8 @@ def getNewsUrl(subCategoryURL):
                 # 중복 뉴스 확인
                 checkResponse = client.execute(query=checkNews, variables = variables)
                 print(checkResponse)
-                if client.execute(query=checkNews, variables=uniqueId) == True:
-                    continue
+                if checkResponse['data']['checkNews'] == True:
+                    break
                 
                 # 뉴스 신문사 필터
                 if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
@@ -159,6 +163,8 @@ def getNewsUrl(subCategoryURL):
                         query=insertNews, variables=newsContent)
                     print(insertResponse)
                     print("--------")
+            if isInserted == True:
+                break
                 
     return
 
@@ -215,7 +221,8 @@ def getNewsContent(newsURL, main, sub):
             Time = Time.replace(u'오전', "") + ' am'
         
         uploadTime = datetime.strptime(Time, '%Y.%m.%d.  %I:%M %p')
-
+        uploadTime = uploadTime.strftime('%Y-%m-%d %H:%M:%S')
+        print(uploadTime)
         urlOrigin = soup.find("a", class_="btn_news_origin")
         urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
 
@@ -227,6 +234,7 @@ def getNewsContent(newsURL, main, sub):
         
         uploadTime = soup.find("span", class_="media_end_head_info_datestamp_time")[
             'data-date-time']
+        print(uploadTime)
 
         urlOrigin = soup.find("a", class_="media_end_head_origin_link")
         urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
@@ -285,7 +293,7 @@ if __name__ == "__main__":
     subCategoryURL = getSubCategoryUrl(mainCategoryURL)
 
     # Flush Buffer
-    #if(IS_INIT):
-    #    initAll(subCategoryURL)
+    if(IS_INIT):
+        initAll(subCategoryURL)
 
     getNewsUrl(subCategoryURL)
