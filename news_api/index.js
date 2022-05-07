@@ -15,6 +15,7 @@ const typeDefs = `
     }
     type Query {
         readNews(id:Int!):News
+        checkNews(uniqueId:String!):Boolean!
     }
     type Mutation {
         insertNews(uniqueId:String!, url:String!, urlOrigin:String!, title:String!, content:String!, uploadTime:String!, main:String!, sub:String!): Boolean!
@@ -37,6 +38,20 @@ const resolvers = {
         },
       });
       return result;
+    },
+    checkNews: async (_, { uniqueId }, ___) => {
+      let result = false;
+      try {
+        await db.news.findUnique({
+          where: {
+            uniqueId,
+          },
+        });
+      } catch (e) {
+        console.log(e);
+        result = true;
+      }
+      return result
     },
   },
   Mutation: {
