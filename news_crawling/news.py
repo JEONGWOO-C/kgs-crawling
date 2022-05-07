@@ -6,6 +6,7 @@ import re
 import pandas as pd
 from bs4 import BeautifulSoup
 import time
+import kss
 from datetime import datetime, timedelta
 from python_graphql_client import GraphqlClient
 
@@ -29,6 +30,11 @@ NEWS_COMPANY = ["연합뉴스", "매일경제", "조선일보", "MBC", "스포�
 NEWS_URL = []
 NEWS = []
 
+readNews = """
+    query Query {
+        readNews
+    }
+"""
 
 deleteAll = """
     mutation Mutation {
@@ -41,7 +47,6 @@ insertNews = """
         insertNews(uniqueId: $uniqueId, url: $url, urlOrigin: $urlOrigin, title: $title, content: $content, uploadTime: $uploadTime, main: $main, sub: $sub)
     }
 """
-
 
 # 과정 함수 1
 # 메인카테고리의 URL을 불러오는 부분
@@ -65,7 +70,6 @@ def getMainCategoryUrl():
             RESULT.append([i.text.strip(), url])  # 결과추가
 
     return RESULT
-
 
 # 과정 함수 2
 # 서브카테고리의 URL을 불러오는 부분
@@ -93,15 +97,61 @@ def getSubCategoryUrl(mainCategoryURL):
                 RESULT.append([main[0], i.text.strip(), BASE_URL+url])  # 결과추가
     return RESULT
 
-
 def no_space(text):
     text1 = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
     return text1
 
-
 def getNewsUrl(subCategoryURL):
+    for page_num in range(1, 31):
+        for sub in subCategoryURL:
+            # 기본 Html Request
+            reqUrl = Request(sub[2]+'&page='+str(page_num),
+                                headers={"User-Agent": "Mozilla/5.0"})
+            html = urlopen(reqUrl)
+            soup = BeautifulSoup(html, "html.parser")
+
+            # 필요한 데이터 영역 필터
+            newsData = soup.select('.type06_headline li dl')
+            for news in newsData:
+                if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
+                    print(news.a.get('href'))
+                    #urllist.append(news.a.get('href'))
+
+            newsData = soup.select('.type06 li dl')
+            for news in newsData:
+                if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
+                    print(news.a.get('href'))
+                    #urllist.append(news.a.get('href'))
+
     return True
 
+def crawling_data_preprocessing(data):
+    split_result=[]
+
+    for sent in kss.split_sentences(data):
+        split_result.append(sent)
+    result=''
+
+    for i in split_result:
+        if clean_text(i):
+            result = result + ' ' + i
+
+    return result.strip()
+
+def clean_text(text):
+    if re.search('([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', text):     # 이메일 지우기
+        return False
+    if re.search('(http|ftp|https)://(?:[-\w.]|(?:%[\da-fA-F]{2}))+', text):    # URL 제거
+        return False
+    if re.search('[0-9-]+\.[0-9-]+\.[0-9-.]+', text):    # 날짜 지우기
+        return False
+    if re.search('\(.+=.+\)', text):  # (@@=@@) 지우기 ex) (서울=연합뉴스)
+        return False
+    if re.search('\[.+\]', text):  # [@@@@] 지우기 ex) [파이낸셜뉴스]
+        return False
+    if re.search('=|Δ|&lt;|&gt;|ⓒ|☎|▲|▶|△|▷', text):   # 특수문자 지우기
+        return False
+    return text[0]!='/' # 첫 문장이 /로 시작하는 문장 지우기
 
 def getNewsContent(newsURL, main, sub):
     uniqueId = ""
@@ -133,6 +183,8 @@ def getNewsContent(newsURL, main, sub):
     content = re.sub('(<([^>]+)>)', '', str(content))
     # 개행문자, 탭, 백슬래시 제거하기
     content = content.replace("\n", "").replace("\t", "").replace('\\', '')
+    # 추가 메타데이터 삭제
+    content = crawling_data_preprocessing(content)
 
     return {
         "uniqueId": uniqueId,
@@ -143,7 +195,6 @@ def getNewsContent(newsURL, main, sub):
         "uploadTime": uploadTime,
         "main": main,
         "sub": sub}
-
 
 def initAll(subCategoryURL):
     deleteResponse = client.execute(query=deleteAll)
@@ -170,7 +221,6 @@ def initAll(subCategoryURL):
     # 단계1 : DB의 모든데이터를 지움
     # 단계2 : 각 SUB_CATEGORY 별 NEWS 한개씩만 추가
 
-
 if __name__ == "__main__":
     # mainCategoryURL [0]:MAIN CATEGORY, [1]:MAIN_URL
     mainCategoryURL = getMainCategoryUrl()
@@ -182,4 +232,4 @@ if __name__ == "__main__":
     if(IS_INIT):
         initAll(subCategoryURL)
 
-    newsURL = getNewsUrl(subCategoryURL)
+    #getNewsUrl(subCategoryURL)
