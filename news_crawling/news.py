@@ -131,7 +131,7 @@ def getNewsUrl(subCategoryURL):
                 
                 # 뉴스 신문사 필터
                 if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
-                    newsContent = getNewsContent(newsUrl, subCategoryURL[0], subCategoryURL[1])
+                    newsContent = getNewsContent(newsUrl, sub[0], sub[1])
                     print(newsContent)
                     insertResponse = client.execute(
                         query=insertNews, variables=newsContent)
@@ -157,7 +157,7 @@ def getNewsUrl(subCategoryURL):
                 
                 # 뉴스 신문사 필터
                 if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
-                    newsContent = getNewsContent(newsUrl, subCategoryURL[0], subCategoryURL[1])
+                    newsContent = getNewsContent(newsUrl, sub[0], sub[1])
                     print(newsContent)
                     insertResponse = client.execute(
                         query=insertNews, variables=newsContent)
@@ -291,6 +291,7 @@ if __name__ == "__main__":
 
     # subCategoryURL [0]:MAIN CATEGORY [1]:SUB CATEGORY, [2]:SUB_URL
     subCategoryURL = getSubCategoryUrl(mainCategoryURL)
+    print(subCategoryURL)
 
     # Flush Buffer
     if(IS_INIT):
