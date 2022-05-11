@@ -2,7 +2,6 @@ from cgitb import text
 from email import header
 from enum import unique
 from pickle import NONE
-from types import NoneType
 from urllib.request import Request, urlopen
 import requests
 import re
@@ -13,7 +12,7 @@ import kss
 from datetime import datetime, timedelta
 from python_graphql_client import GraphqlClient
 
-client = GraphqlClient(endpoint="http://localhost:1000")
+client = GraphqlClient(endpoint="http://localhost:8080")
 
 # Init 단발성 이벤트 필요할때만
 # 대분류 URL
@@ -107,7 +106,7 @@ def no_space(text):
 def getNewsUrl(subCategoryURL):
     for sub in subCategoryURL:
         isInserted = False
-        for page_num in range(1, 31):
+        for page_num in range(1, 15):
             # 기본 Html Request
             reqUrl = Request(sub[2]+'&page='+str(page_num),
                                 headers={"User-Agent": "Mozilla/5.0"})
@@ -208,10 +207,10 @@ def getNewsContent(newsURL, main, sub):
                      headers={"User-Agent": "Mozilla/5.0"})
     html = urlopen(reqUrl)
     soup = BeautifulSoup(html, "html.parser")
+    print(newsURL)
 
-    #if soup.find("h2", class_="media_end_head_headline") == None :
-    if soup.find("div", class_="media_end_head_title").find("h2", class_="media_end_head_headline") == None :
-        print("if" + newsURL)
+    if soup.find("h2", class_="end_tit") != None :
+
         title = soup.find("h2", class_="end_tit").text.strip()
         
         Time = soup.find("span", class_="author").find('em').text.strip()
@@ -232,8 +231,7 @@ def getNewsContent(newsURL, main, sub):
         content = soup.find("div", id="articeBody")
         #ex : https://entertain.naver.com/read?oid=469&aid=0000673736
 
-    else:
-        print("else" +newsURL)
+    elif soup.find("div", class_="media_end_head_title").find("h2", class_="media_end_head_headline") != None :
         title = soup.find("h2", class_="media_end_head_headline").text.strip()
         
         uploadTime = soup.find("span", class_="media_end_head_info_datestamp_time")[
@@ -247,8 +245,8 @@ def getNewsContent(newsURL, main, sub):
 
         content = soup.find("div", id="dic_area")
         #ex : https://n.news.naver.com/mnews/article/658/0000008985?sid=102
-    
-    if content != NoneType:
+
+    if content != type(None):
         # 뉴스 요약 삭제하기
         content = re.sub('<strong.*?>.*?</strong>', '', str(content))
         # HTML tag 삭제하기
@@ -257,7 +255,7 @@ def getNewsContent(newsURL, main, sub):
         content = content.replace("\n", "").replace("\t", "").replace('\\', '')
         # 추가 메타데이터 삭제
         content = crawling_data_preprocessing(content)
-
+    print("uniqueId : " + uniqueId+"\nurl : " + newsURL+"\nurlOrigin : " + urlOrigin+"\ntitle : "+title+"\ncontent : " + content[0:10]+"\nuploadtime : "+uploadTime+"\nmain : "+main+"\nsub : "+sub+"\n")
     return {
         "uniqueId": uniqueId,
         "url": newsURL,

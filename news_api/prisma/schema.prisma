@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_TEST")
+  provider = "mysql"
+  url      = env("DATABASE")
 }
 
 model News {
@@ -17,7 +17,7 @@ model News {
   url        String //뉴스 링크
   urlOrigin  String //뉴스 원본링크
   title      String //뉴스 제목
-  content    String //뉴스 본문
+  content    String @db.VarChar(20000) //뉴스 본문
   main       String //뉴스 대분류
   sub        String //뉴스 소분류
   uploadTime DateTime //뉴스 업로드 시간
