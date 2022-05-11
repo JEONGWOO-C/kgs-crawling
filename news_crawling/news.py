@@ -2,6 +2,7 @@ from cgitb import text
 from email import header
 from enum import unique
 from pickle import NONE
+from types import NoneType
 from urllib.request import Request, urlopen
 import requests
 import re
@@ -132,7 +133,6 @@ def getNewsUrl(subCategoryURL):
                 # 뉴스 신문사 필터
                 if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
                     newsContent = getNewsContent(newsUrl, sub[0], sub[1])
-                    print(newsContent)
                     insertResponse = client.execute(
                         query=insertNews, variables=newsContent)
                     print(insertResponse)
@@ -147,7 +147,6 @@ def getNewsUrl(subCategoryURL):
                 # 각 뉴스별 ID 필터
                 uniqueId = newsUrl[newsUrl.rfind('/') + 1: newsUrl.rfind("?sid")]
                 variables = { "uniqueId": uniqueId }
-                print(variables)
 
                 # 중복 뉴스 확인
                 checkResponse = client.execute(query=checkNews, variables = variables)
@@ -158,7 +157,6 @@ def getNewsUrl(subCategoryURL):
                 # 뉴스 신문사 필터
                 if news.find("span", class_="writing").text.strip() in NEWS_COMPANY:
                     newsContent = getNewsContent(newsUrl, sub[0], sub[1])
-                    print(newsContent)
                     insertResponse = client.execute(
                         query=insertNews, variables=newsContent)
                     print(insertResponse)
@@ -211,7 +209,9 @@ def getNewsContent(newsURL, main, sub):
     html = urlopen(reqUrl)
     soup = BeautifulSoup(html, "html.parser")
 
-    if soup.find("h2", class_="media_end_head_headline") == None :
+    #if soup.find("h2", class_="media_end_head_headline") == None :
+    if soup.find("div", class_="media_end_head_title").find("h2", class_="media_end_head_headline") == None :
+        print("if" + newsURL)
         title = soup.find("h2", class_="end_tit").text.strip()
         
         Time = soup.find("span", class_="author").find('em').text.strip()
@@ -222,34 +222,41 @@ def getNewsContent(newsURL, main, sub):
         
         uploadTime = datetime.strptime(Time, '%Y.%m.%d.  %I:%M %p')
         uploadTime = uploadTime.strftime('%Y-%m-%d %H:%M:%S')
-        print(uploadTime)
-        urlOrigin = soup.find("a", class_="btn_news_origin")
-        urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
+        
+        try:
+            urlOrigin = soup.find("a", class_="btn_news_origin")
+            urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
+        except:
+            urlOrigin = ""
 
         content = soup.find("div", id="articeBody")
         #ex : https://entertain.naver.com/read?oid=469&aid=0000673736
 
     else:
+        print("else" +newsURL)
         title = soup.find("h2", class_="media_end_head_headline").text.strip()
         
         uploadTime = soup.find("span", class_="media_end_head_info_datestamp_time")[
             'data-date-time']
-        print(uploadTime)
-
-        urlOrigin = soup.find("a", class_="media_end_head_origin_link")
-        urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
+            
+        try:
+            urlOrigin = soup.find("a", class_="media_end_head_origin_link")
+            urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
+        except:
+            urlOrigin = ""
 
         content = soup.find("div", id="dic_area")
         #ex : https://n.news.naver.com/mnews/article/658/0000008985?sid=102
     
-    # 뉴스 요약 삭제하기
-    content = re.sub('<strong.*?>.*?</strong>', '', str(content))
-    # HTML tag 삭제하기
-    content = re.sub('(<([^>]+)>)', '', str(content))
-    # 개행문자, 탭, 백슬래시 제거하기
-    content = content.replace("\n", "").replace("\t", "").replace('\\', '')
-    # 추가 메타데이터 삭제
-    content = crawling_data_preprocessing(content)
+    if content != NoneType:
+        # 뉴스 요약 삭제하기
+        content = re.sub('<strong.*?>.*?</strong>', '', str(content))
+        # HTML tag 삭제하기
+        content = re.sub('(<([^>]+)>)', '', str(content))
+        # 개행문자, 탭, 백슬래시 제거하기
+        content = content.replace("\n", "").replace("\t", "").replace('\\', '')
+        # 추가 메타데이터 삭제
+        content = crawling_data_preprocessing(content)
 
     return {
         "uniqueId": uniqueId,
