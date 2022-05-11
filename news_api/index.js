@@ -108,6 +108,6 @@ const server = new ApolloServer({
 // 서버 구동
 server
   .listen({
-    port: 1000,
+    port: 5000,
   })
   .then(({ url }) => console.log(`GraphQL Service running on ${url}`));

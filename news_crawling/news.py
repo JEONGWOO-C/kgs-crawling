@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from cgitb import text
 from email import header
 from enum import unique
@@ -12,7 +13,7 @@ import kss
 from datetime import datetime, timedelta
 from python_graphql_client import GraphqlClient
 
-client = GraphqlClient(endpoint="http://localhost:8080")
+client = GraphqlClient(endpoint="http://localhost:5000")
 
 # Init 단발성 이벤트 필요할때만
 # 대분류 URL
@@ -20,7 +21,7 @@ client = GraphqlClient(endpoint="http://localhost:8080")
 # 대분류 URL > 소분류 URL > 뉴스기사 URL
 # 대분류 URL > 소분류 URL > 뉴스기사 URL > 각 뉴스정보
 BASE_URL = "https://news.naver.com"
-IS_INIT = True
+IS_INIT = False
 MAIN_CATEGORY = ["정치", "경제", "사회", "생활/문화", "IT/과학"]
 SUB_CATEGORY = ["청와대", "국회/정당", "북한", "행정", "국방/외교", "정치일반", "금융", "증권", "산업/재계",
                 "중기/벤처", "부동산", "글로벌 경제", "생활경제", "경제 일반", "사건사고", "교육", "노동",
