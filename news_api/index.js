@@ -14,10 +14,10 @@ const typeDefs = `
         url:String!
     }
     type Query {
-        readNews(id:Int!):News
         checkNews(uniqueId:String!):Boolean!
     }
     type Mutation {
+        readNews:News
         insertNews(uniqueId:String!, url:String!, urlOrigin:String!, title:String!, content:String!, uploadTime:String!, main:String!, sub:String!): Boolean!
         deleteAll:Boolean!
     }
@@ -26,19 +26,7 @@ const typeDefs = `
 // 리졸버
 const resolvers = {
   Query: {
-    readNews: async (_, { id }, ___) => {
-      const result = await db.news.findUnique({
-        where: {
-          id,
-        },
-      });
-      await db.news.delete({
-        where: {
-          id,
-        },
-      });
-      return result;
-    },
+    
     checkNews: async (_, { uniqueId }, ___) => {
       const result = await db.news.findUnique({
         where: { 
@@ -50,6 +38,19 @@ const resolvers = {
     },
   },
   Mutation: {
+    readNews: async (_, __, ___) => {
+      const result = await db.news.findFirst({
+        orderBy: {
+          id: "asc",
+        },
+      });
+      await db.news.delete({
+        where: {
+          id:result.id,
+        },
+      });
+      return result;
+    },
     deleteAll: async () => {
       let result = true;
       try {
