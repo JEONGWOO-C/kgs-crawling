@@ -4,20 +4,24 @@ import pkg from "@prisma/client";
 const { PrismaClient } = pkg;
 const db = new PrismaClient();
 
-const BUFFER_MAX = 100;
+const BUFFER_MAX = 200;
 
 // 스키마
 const typeDefs = `
     type News {
         id:Int!
+        title:String!
         content:String!
         url:String!
+        uploadTime:String!
+        main:String!
+        sub:String!
     }
     type Query {
-        readNews(id:Int!):News
         checkNews(uniqueId:String!):Boolean!
     }
     type Mutation {
+        readNews:News
         insertNews(uniqueId:String!, url:String!, urlOrigin:String!, title:String!, content:String!, uploadTime:String!, main:String!, sub:String!): Boolean!
         deleteAll:Boolean!
     }
@@ -26,19 +30,7 @@ const typeDefs = `
 // 리졸버
 const resolvers = {
   Query: {
-    readNews: async (_, { id }, ___) => {
-      const result = await db.news.findUnique({
-        where: {
-          id,
-        },
-      });
-      await db.news.delete({
-        where: {
-          id,
-        },
-      });
-      return result;
-    },
+    
     checkNews: async (_, { uniqueId }, ___) => {
       const result = await db.news.findUnique({
         where: { 
@@ -50,6 +42,19 @@ const resolvers = {
     },
   },
   Mutation: {
+    readNews: async (_, __, ___) => {
+      const result = await db.news.findFirst({
+        orderBy: {
+          id: "asc",
+        },
+      });
+      await db.news.delete({
+        where: {
+          id:result.id,
+        },
+      });
+      return result;
+    },
     deleteAll: async () => {
       let result = true;
       try {
@@ -108,6 +113,6 @@ const server = new ApolloServer({
 // 서버 구동
 server
   .listen({
-    port: 1000,
+    port: 5000,
   })
   .then(({ url }) => console.log(`GraphQL Service running on ${url}`));
