@@ -100,10 +100,6 @@ def getSubCategoryUrl(mainCategoryURL):
                 RESULT.append([main[0], i.text.strip(), BASE_URL+url])  # 결과추가
     return RESULT
 
-def no_space(text):
-    text1 = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
-    return text1
-
 def getNewsUrl(subCategoryURL):
     for sub in subCategoryURL:
         isInserted = False
@@ -166,9 +162,15 @@ def getNewsUrl(subCategoryURL):
                 
     return
 
-def crawling_data_preprocessing(data):
-    split_result=[]
+def contentPreprocess(data):
+    # 뉴스 요약 삭제하기
+    data = re.sub('<strong.*?>.*?</strong>', '', str(data))
+    # HTML tag 삭제하기
+    data = re.sub('(<([^>]+)>)', '', str(data))
+    # 개행문자, 탭, 백슬래시 제거하기
+    data = data.replace("\n", "").replace("\t", "").replace('\\', '')
 
+    split_result=[]
     for sent in kss.split_sentences(data):
         split_result.append(sent)
     result=''
@@ -211,7 +213,6 @@ def getNewsContent(newsURL, main, sub):
     print(newsURL)
 
     if soup.find("h2", class_="end_tit") != None :
-
         title = soup.find("h2", class_="end_tit").text.strip()
         
         Time = soup.find("span", class_="author").find('em').text.strip()
@@ -219,7 +220,6 @@ def getNewsContent(newsURL, main, sub):
             Time = Time.replace(u'오후', "") + ' pm'
         else:
             Time = Time.replace(u'오전', "") + ' am'
-        
         uploadTime = datetime.strptime(Time, '%Y.%m.%d.  %I:%M %p')
         uploadTime = uploadTime.strftime('%Y-%m-%d %H:%M:%S')
         
@@ -247,15 +247,30 @@ def getNewsContent(newsURL, main, sub):
         content = soup.find("div", id="dic_area")
         #ex : https://n.news.naver.com/mnews/article/658/0000008985?sid=102
 
+    elif soup.find("h4", class_="title") != None:
+        title = soup.find("h4", class_="title").text.strip()
+
+        Time = soup.find("div", class_="info").find('span').text.strip().strip("기사입력 ")
+        if Time.find('오전') == -1:
+            Time = Time.replace(u'오후', "") + ' pm'
+        else:
+            Time = Time.replace(u'오전', "") + ' am'
+        uploadTime = datetime.strptime(Time, '%Y.%m.%d.  %I:%M %p')
+        uploadTime = uploadTime.strftime('%Y-%m-%d %H:%M:%S')
+
+        try:
+            urlOrigin = soup.find("a", class_="press_link")
+            urlOrigin = urlOrigin["href"] if urlOrigin["href"] != None else None
+        except:
+            urlOrigin = ""
+        
+        content = soup.find("div", id="newsEndContents")
+        #ex : https://sports.naver.com/news?oid=001&aid=0013191035
+
+
     if content != type(None):
-        # 뉴스 요약 삭제하기
-        content = re.sub('<strong.*?>.*?</strong>', '', str(content))
-        # HTML tag 삭제하기
-        content = re.sub('(<([^>]+)>)', '', str(content))
-        # 개행문자, 탭, 백슬래시 제거하기
-        content = content.replace("\n", "").replace("\t", "").replace('\\', '')
-        # 추가 메타데이터 삭제
-        content = crawling_data_preprocessing(content)
+        #뉴스 본문 전처리
+        content = contentPreprocess(content)
     print("uniqueId : " + uniqueId+"\nurl : " + newsURL+"\nurlOrigin : " + urlOrigin+"\ntitle : "+title+"\ncontent : " + content[0:10]+"\nuploadtime : "+uploadTime+"\nmain : "+main+"\nsub : "+sub+"\n")
     return {
         "uniqueId": uniqueId,

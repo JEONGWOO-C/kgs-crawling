@@ -4,7 +4,7 @@ import pkg from "@prisma/client";
 const { PrismaClient } = pkg;
 const db = new PrismaClient();
 
-const BUFFER_MAX = 200;
+const BUFFER_MAX = 300;
 
 // 스키마
 const typeDefs = `
